@@ -35,6 +35,13 @@ pub struct LedgerRecord {
     pub signature_hex: String,
 }
 
+/// fsync a directory so entries created in it are durable.
+fn fsync_dir(dir: &Path) -> Result<(), String> {
+    File::open(dir)
+        .and_then(|d| d.sync_all())
+        .map_err(|e| format!("cannot fsync ledger directory {}: {e}", dir.display()))
+}
+
 /// Append handle to a ledger file.
 pub struct LedgerFile {
     path: PathBuf,
@@ -46,7 +53,14 @@ impl LedgerFile {
     /// Open (creating if absent) and return every record already on disk.
     pub fn open(path: &Path) -> Result<(Self, Vec<LedgerRecord>), String> {
         let parent = path.parent().ok_or_else(|| format!("ledger path {} has no parent", path.display()))?;
+        let parent_existed = parent.exists();
         std::fs::create_dir_all(parent).map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+        if !parent_existed {
+            // A freshly created data directory must itself survive a crash.
+            if let Some(grandparent) = parent.parent().filter(|g| !g.as_os_str().is_empty()) {
+                fsync_dir(grandparent)?;
+            }
+        }
         let existed = path.exists();
 
         let mut file = OpenOptions::new()
@@ -77,9 +91,7 @@ impl LedgerFile {
 
         if !existed {
             // Persist the new directory entry itself.
-            File::open(parent)
-                .and_then(|d| d.sync_all())
-                .map_err(|e| format!("cannot fsync ledger directory {}: {e}", parent.display()))?;
+            fsync_dir(parent)?;
         }
 
         Ok((Self { path: path.to_path_buf(), file, poisoned: false }, records))
@@ -105,5 +117,43 @@ impl LedgerFile {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(seq: u64) -> LedgerRecord {
+        LedgerRecord {
+            v: LEDGER_VERSION,
+            tenant_id: "t".into(),
+            sequence: seq,
+            timestamp_ns: 1,
+            action_kind: 5,
+            action_name: "A".into(),
+            partition_id: 1,
+            payload_hex: String::new(),
+            prev_hash_hex: "00".repeat(32),
+            record_hash_hex: "11".repeat(32),
+            chain_hash_hex: "22".repeat(32),
+            public_key_hex: "33".repeat(32),
+            signature_hex: "44".repeat(64),
+        }
+    }
+
+    #[test]
+    fn open_creates_missing_nested_data_dir_and_records_survive_reopen() {
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+        let root = std::env::temp_dir().join(format!("agentlaw-ledger-{}-{nanos}", std::process::id()));
+        let path = root.join("a").join("b").join("ledger.jsonl");
+        {
+            let (mut ledger, existing) = LedgerFile::open(&path).expect("open creates dirs");
+            assert!(existing.is_empty());
+            ledger.append(&record(1)).expect("append");
+        }
+        let (_, records) = LedgerFile::open(&path).expect("reopen");
+        assert_eq!(records, vec![record(1)]);
+        std::fs::remove_dir_all(&root).ok();
     }
 }
