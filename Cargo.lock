@@ -2684,6 +2684,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rvm-agentlaw"
+version = "0.1.1"
+dependencies = [
+ "ed25519-dalek",
+ "rvm-cap",
+ "rvm-partition",
+ "rvm-proof",
+ "rvm-security",
+ "rvm-types",
+ "rvm-witness",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "rvm-anchor"
 version = "0.1.1"
 dependencies = [

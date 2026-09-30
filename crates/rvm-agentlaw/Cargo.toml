@@ -1,0 +1,28 @@
+[package]
+name = "rvm-agentlaw"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "AgentLaw: Hardware-Enforced EU AI Act Compliance & Non-Repudiation Appliance for Autonomous AI Agents"
+
+[dependencies]
+rvm-types = { workspace = true }
+rvm-cap = { workspace = true }
+rvm-witness = { workspace = true }
+rvm-proof = { workspace = true }
+rvm-security = { workspace = true }
+rvm-partition = { workspace = true }
+sha2 = { workspace = true }
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lib]
+name = "rvm_agentlaw"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agentlaw"
+path = "src/main.rs"

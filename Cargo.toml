@@ -21,6 +21,7 @@ members = [
     "crates/rvm-context-service",
     "crates/rvm-gpu",
     "crates/rvm-kernel",
+    "crates/rvm-agentlaw",
     "tests",
     "benches",
 ]
